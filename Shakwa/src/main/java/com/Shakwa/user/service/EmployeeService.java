@@ -1,17 +1,26 @@
 package com.Shakwa.user.service;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.logging.Logger;
 
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.Shakwa.config.JwtService;
+import com.Shakwa.config.RateLimiterConfig;
 import com.Shakwa.user.Enum.GovernmentAgencyType;
+import com.Shakwa.user.dto.AuthenticationRequest;
 import com.Shakwa.user.dto.EmployeeCreateRequestDTO;
 import com.Shakwa.user.dto.EmployeeResponseDTO;
 import com.Shakwa.user.dto.EmployeeUpdateRequestDTO;
+import com.Shakwa.user.dto.UserAuthenticationResponse;
 import com.Shakwa.user.entity.Employee;
 import com.Shakwa.user.entity.Role;
 import com.Shakwa.user.entity.User;
@@ -20,8 +29,14 @@ import com.Shakwa.user.repository.EmployeeRepository;
 import com.Shakwa.user.repository.CitizenRepo;
 import com.Shakwa.user.repository.RoleRepository;
 import com.Shakwa.user.repository.UserRepository;
+import com.Shakwa.utils.exception.RequestNotValidException;
 import com.Shakwa.utils.exception.ResourceNotFoundException;
+import com.Shakwa.utils.exception.TooManyRequestException;
 import com.Shakwa.utils.exception.UnAuthorizedException;
+
+import io.github.resilience4j.ratelimiter.RateLimiter;
+import io.github.resilience4j.ratelimiter.RateLimiterRegistry;
+import jakarta.servlet.http.HttpServletRequest;
 
 @Service
 @Transactional
@@ -30,16 +45,28 @@ public class EmployeeService extends BaseSecurityService {
     private final EmployeeRepository employeeRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
+    private final AuthenticationManager authenticationManager;
+    private final JwtService jwtService;
+    private final RateLimiterConfig rateLimiterConfig;
+    private final RateLimiterRegistry rateLimiterRegistry;
     
     public EmployeeService(EmployeeRepository employeeRepository,
                           RoleRepository roleRepository,
                          PasswordEncoder passwordEncoder,
                          UserRepository userRepository,
-                         CitizenRepo citizenRepo) {
+                         CitizenRepo citizenRepo,
+                         AuthenticationManager authenticationManager,
+                         JwtService jwtService,
+                         RateLimiterConfig rateLimiterConfig,
+                         RateLimiterRegistry rateLimiterRegistry) {
         super(userRepository, citizenRepo);
         this.employeeRepository = employeeRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
+        this.authenticationManager = authenticationManager;
+        this.jwtService = jwtService;
+        this.rateLimiterConfig = rateLimiterConfig;
+        this.rateLimiterRegistry = rateLimiterRegistry;
     }
     
     Logger logger = Logger.getLogger(EmployeeService.class.getName());
@@ -47,7 +74,6 @@ public class EmployeeService extends BaseSecurityService {
     @Transactional
     public EmployeeResponseDTO addEmployee(EmployeeCreateRequestDTO dto) {
         // السماح فقط لأدمن النظام بإنشاء موظفين
-        User currentUser = getCurrentUser();
         if (!isAdmin()) {
             throw new UnAuthorizedException("Only platform admins can create employees");
         }
@@ -55,6 +81,11 @@ public class EmployeeService extends BaseSecurityService {
         // التحقق من وجود governmentAgency في الـ DTO
         if (dto.getGovernmentAgencyType() == null) {
             throw new UnAuthorizedException("Government agency type is required when creating an employee");
+        }
+        
+        // التحقق من وجود roleName
+        if (dto.getRoleName() == null || dto.getRoleName().trim().isEmpty()) {
+            throw new UnAuthorizedException("Role name must be provided");
         }
         
         GovernmentAgencyType governmentAgency = dto.getGovernmentAgencyType();
@@ -94,7 +125,6 @@ public class EmployeeService extends BaseSecurityService {
     
     public EmployeeResponseDTO updateEmployeeInGovernmentAgency(Long employeeId, EmployeeUpdateRequestDTO dto) {
         // Validate that the current user is a platform admin
-        User currentUser = getCurrentUser();
         if (!isAdmin()) {
             throw new UnAuthorizedException("Only platform admins can update employees");
         }
@@ -117,7 +147,6 @@ public class EmployeeService extends BaseSecurityService {
     @Transactional
     public void deleteEmployeeInGovernmentAgency(Long employeeId) {
         // Validate that the current user is a platform admin
-        User currentUser = getCurrentUser();
         if (!isAdmin()) {
             throw new UnAuthorizedException("Only platform admins can delete employees");
         }
@@ -317,9 +346,17 @@ public class EmployeeService extends BaseSecurityService {
         employee.setGovernmentAgency(governmentAgency);
         employee.setPassword(passwordEncoder.encode(dto.getPassword()));
         
-        Role role = roleRepository.findById(dto.getRoleId()).orElseThrow(
-                () -> new ResourceNotFoundException("Invalid role id: " + dto.getRoleId())
-        );
+        // Validate and get role - support both roleId and roleName
+        Role role;
+        role = roleRepository.findByName(dto.getRoleName().trim().toUpperCase())
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Role not found with name: " + dto.getRoleName() + ". Available roles: SUPERVISOR, VIEWER. Please check available roles at /api/v1/roles/employee-roles"));
+        
+        // Validate that the role is active
+        if (!role.isActive()) {
+            throw new UnAuthorizedException("Cannot assign inactive role: " + role.getName());
+        }
+        
         employee.setRole(role);
         
         return employee;
@@ -353,13 +390,77 @@ public class EmployeeService extends BaseSecurityService {
         EmployeeMapper.updateEntity(employee, dto);
         
         // Handle role update separately
-        if(dto.getRoleId() != null) {
-            Role role = roleRepository.findById(dto.getRoleId()).orElseThrow(
-                    () -> new ResourceNotFoundException("Invalid role id: " + dto.getRoleId())
-            );
+        if(dto.getRoleName() != null && !dto.getRoleName().trim().isEmpty()) {
+            Role role = roleRepository.findByName(dto.getRoleName().trim().toUpperCase())
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Role not found with name: " + dto.getRoleName() + ". Available roles: SUPERVISOR, VIEWER. Please check available roles at /api/v1/roles/employee-roles"));
+            
+            // Validate that the role is active
+            if (!role.isActive()) {
+                throw new UnAuthorizedException("Cannot assign inactive role: " + role.getName());
+            }
+            
             employee.setRole(role);
         }
+
+        
     }
+
+    public UserAuthenticationResponse login(AuthenticationRequest request, HttpServletRequest httpServletRequest) {
+        String userIp = httpServletRequest.getRemoteAddr();
+        if (rateLimiterConfig.getBlockedIPs().contains(userIp)) {
+            throw new TooManyRequestException("Too many login attempts. Please try again later.");
+        }
+
+        String rateLimiterKey = "employeeLoginRateLimiter-" + userIp;
+        RateLimiter rateLimiter = rateLimiterRegistry.rateLimiter(rateLimiterKey);
+
+        if (rateLimiter.acquirePermission()) {
+            Authentication authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(
+                            request.getEmail(),
+                            request.getPassword(),
+                            new HashSet<>()
+                    ));
+
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+
+            // البحث عن الموظف باستخدام البريد الإلكتروني
+            var employee = employeeRepository.findByEmail(request.getEmail()).orElseThrow(
+                    () -> new RequestNotValidException("Employee email not found")
+            );
+
+            // التحقق من أن الموظف نشط
+            if (employee.getStatus() != null && !employee.getStatus().name().equals("ACTIVE")) {
+                throw new RequestNotValidException("Employee account is not active");
+            }
+
+            var jwtToken = jwtService.generateToken(employee);
+            
+            UserAuthenticationResponse response = employeeToAuthResponse(employee);
+            response.setToken(jwtToken);
+
+            logger.info("Employee login successful for email: " + request.getEmail());
+            return response;
+        } else {
+            rateLimiterConfig.blockIP(userIp);
+            throw new TooManyRequestException("Too many login attempts, Please try again later.");
+        }
+    }
+    
+    /**
+     * تحويل Employee إلى UserAuthenticationResponse
+     */
+    private UserAuthenticationResponse employeeToAuthResponse(Employee employee) {
+        UserAuthenticationResponse response = new UserAuthenticationResponse();
+        response.setEmail(employee.getEmail());
+        response.setFirstName(employee.getFirstName());
+        response.setLastName(employee.getLastName());
+        response.setRole(employee.getRole() != null ? employee.getRole().getName() : "EMPLOYEE");
+        response.setIsActive(employee.getStatus() != null && employee.getStatus().name().equals("ACTIVE"));
+        return response;
+    }
+
     
    
 } 

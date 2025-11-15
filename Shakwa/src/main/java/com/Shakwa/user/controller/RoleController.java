@@ -168,4 +168,20 @@ public class RoleController {
         Role updatedRole = roleService.updateRolePermissions(id, permissions);
         return ResponseEntity.ok(updatedRole);
     }
+
+    @GetMapping("/employee-roles")
+    @Operation(
+        summary = "Get employee roles",
+        description = "Retrieves a list of roles that can be assigned to employees (excludes PLATFORM_ADMIN). This endpoint is public and can be accessed without authentication."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Successfully retrieved employee roles",
+            content = @Content(mediaType = "application/json",
+            schema = @Schema(implementation = Role.class))),
+        @ApiResponse(responseCode = "500", description = "Internal server error")
+    })
+    public ResponseEntity<List<Role>> getEmployeeRoles() {
+        List<Role> roles = roleService.getEmployeeRoles();
+        return new ResponseEntity<>(roles, HttpStatus.OK);
+    }
 } 

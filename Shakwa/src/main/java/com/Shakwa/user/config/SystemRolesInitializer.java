@@ -16,12 +16,14 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.Shakwa.user.entity.Permission;
 import com.Shakwa.user.entity.Role;
+import com.Shakwa.user.entity.User;
 import com.Shakwa.user.repository.PermissionRepository;
 import com.Shakwa.user.repository.RoleRepository;
+import com.Shakwa.user.repository.UserRepository;
 import com.Shakwa.user.config.RoleConstants;
 
 import lombok.RequiredArgsConstructor;
-
+import jakarta.persistence.EntityManager;
 @Component
 @RequiredArgsConstructor
 @Order(1) // Run after database migration
@@ -30,24 +32,22 @@ public class SystemRolesInitializer implements CommandLineRunner {
 
     private final RoleRepository roleRepository;
     private final PermissionRepository permissionRepository;
+    private final UserRepository userRepository;
 
     @Override
     @Transactional
     public void run(String... args) {
         log.info("Initializing system roles and permissions...");
 
-        if (permissionRepository.count() == 0) {
-            Map<String, Permission> permissions = createPermissions();
+        // Always create/update permissions
+        Map<String, Permission> permissions = createPermissions();
 
-            if(roleRepository.count() == 0) {
-                // Create system roles with their permissions
-                createSystemRoles(permissions);
-            }
-        }
-        else {
-            log.info("System roles and permissions already exist.");
-        }
-        // Create permissions
+        // Always create/update system roles (will update if exist, create if not)
+        createSystemRoles(permissions);
+        
+        // Remove old roles that are no longer needed
+        removeOldRoles();
+        
         log.info("System roles and permissions initialized successfully");
     }
 
@@ -67,6 +67,12 @@ public class SystemRolesInitializer implements CommandLineRunner {
             createPermission("EMPLOYEE_READ", "View employees", "EMPLOYEE", "READ"),
             createPermission("EMPLOYEE_UPDATE", "Update employees", "EMPLOYEE", "UPDATE"),
             createPermission("EMPLOYEE_DELETE", "Delete employees", "EMPLOYEE", "DELETE"),
+
+            // Citizen management
+            createPermission("CITIZEN_CREATE", "Create citizens", "CITIZEN", "CREATE"),
+            createPermission("CITIZEN_READ", "View citizens", "CITIZEN", "READ"),
+            createPermission("CITIZEN_UPDATE", "Update citizens", "CITIZEN", "UPDATE"),
+            createPermission("CITIZEN_DELETE", "Delete citizens", "CITIZEN", "DELETE"),
 
             // GovernmentAgency management
             createPermission("PHARMACY_UPDATE", "Update governmentAgency info", "PHARMACY", "UPDATE"),
@@ -112,23 +118,29 @@ public class SystemRolesInitializer implements CommandLineRunner {
         // Platform Admin role with all permissions
         createSystemRole(RoleConstants.PLATFORM_ADMIN, "Platform Administrator", new HashSet<>(permissions.values()));
 
-        // GovernmentAgency Manager role with specific permissions
-        createSystemRole(RoleConstants.PHARMACY_MANAGER, "GovernmentAgency Manager",
+        // Supervisor role with management permissions
+        createSystemRole(RoleConstants.SUPERVISOR, "Supervisor",
             new HashSet<>(Arrays.asList(
                 permissions.get("EMPLOYEE_CREATE"),
                 permissions.get("EMPLOYEE_READ"),
                 permissions.get("EMPLOYEE_UPDATE"),
                 permissions.get("EMPLOYEE_DELETE"),
-                permissions.get("PHARMACY_UPDATE"),
-                permissions.get("PHARMACY_READ"),
-                permissions.get("USER_READ")
+                permissions.get("USER_READ"),
+                permissions.get("USER_UPDATE"),
+                permissions.get("CITIZEN_READ"),
+                permissions.get("CITIZEN_UPDATE"),
+                permissions.get("REPORT_VIEW")
             )));
 
-        // GovernmentAgency Employee role (permissions to be defined later)
-        createSystemRole(RoleConstants.PHARMACY_EMPLOYEE, "GovernmentAgency Employee", new HashSet<>());
-
-        // GovernmentAgency Trainer role (permissions to be defined later)
-        createSystemRole(RoleConstants.PHARMACY_TRAINEE, "GovernmentAgency Trainer", new HashSet<>());
+        // Viewer role with read-only permissions
+        createSystemRole(RoleConstants.VIEWER, "Viewer",
+            new HashSet<>(Arrays.asList(
+                permissions.get("EMPLOYEE_READ"),
+                permissions.get("PHARMACY_READ"),
+                permissions.get("USER_READ"),
+                permissions.get("CITIZEN_READ"),
+                permissions.get("REPORT_VIEW")
+            )));
     }
 
     private Permission createPermission(String name, String description, String resource, String action) {
@@ -145,6 +157,7 @@ public class SystemRolesInitializer implements CommandLineRunner {
     private void createSystemRole(String name, String description, Set<Permission> permissions) {
         Role role = roleRepository.findByName(name)
             .orElseGet(() -> {
+                log.info("Creating new role: {}", name);
                 Role newRole = Role.builder()
                     .name(name)
                     .description(description)
@@ -155,7 +168,56 @@ public class SystemRolesInitializer implements CommandLineRunner {
                 return roleRepository.save(newRole);
             });
         
+        // Update role permissions and description even if role exists
+        log.info("Updating role: {} with {} permissions", name, permissions.size());
+        role.setDescription(description);
         role.setPermissions(permissions);
+        role.setActive(true);
         roleRepository.save(role);
+    }
+    
+    /**
+     * Remove old roles that are no longer used in the system
+     */
+    private void removeOldRoles() {
+        List<String> oldRoleNames = Arrays.asList(
+            "PHARMACY_MANAGER",
+            "PHARMACY_EMPLOYEE",
+            "PHARMACY_TRAINEE"
+        );
+        
+        for (String oldRoleName : oldRoleNames) {
+            roleRepository.findByName(oldRoleName).ifPresent(role -> {
+                try {
+                    // Check if any users are using this role
+                    List<User> usersWithRole = userRepository.findAll().stream()
+                            .filter(user -> user.getRole() != null && user.getRole().getId().equals(role.getId()))
+                            .toList();
+                    
+                    if (!usersWithRole.isEmpty()) {
+                        log.warn("Cannot delete role '{}' because {} user(s) are using it. Please migrate users to SUPERVISOR or VIEWER first.", 
+                                oldRoleName, usersWithRole.size());
+                        log.warn("Users using this role: {}", 
+                                usersWithRole.stream()
+                                        .map(u -> u.getEmail() + " (ID: " + u.getId() + ")")
+                                        .collect(java.util.stream.Collectors.joining(", ")));
+                        // Deactivate instead of delete if users exist
+                        role.setActive(false);
+                        roleRepository.save(role);
+                    } else {
+                        // Safe to delete - no users are using this role
+                        log.info("Deleting old role '{}' (no users are using it)", oldRoleName);
+                        roleRepository.delete(role);
+                        log.info("Successfully deleted role '{}'", oldRoleName);
+                    }
+                } catch (Exception e) {
+                    log.error("Error while trying to delete role '{}': {}", oldRoleName, e.getMessage());
+                    // Fallback: deactivate instead of delete
+                    role.setActive(false);
+                    roleRepository.save(role);
+                    log.warn("Deactivated role '{}' instead of deleting due to error", oldRoleName);
+                }
+            });
+        }
     }
 } 

@@ -1,5 +1,6 @@
 package com.Shakwa.user.dto;
 
+import com.Shakwa.user.Enum.UserStatus;
 import com.fasterxml.jackson.annotation.JsonFormat;
 
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -22,8 +23,10 @@ public class EmployeeUpdateRequestDTO {
     @Schema(description = "Employee's hire date", example = "2024-01-15")
     private LocalDate dateOfHire;
     
-    @Schema(description = "Role ID for the employee", example = "2")
-    private Long roleId;
+    @Schema(description = "Role name for the employee (SUPERVISOR or VIEWER). Either roleId or roleName must be provided", example = "SUPERVISOR")
+    private String roleName;
+
+    private UserStatus status;
     
 
 } 

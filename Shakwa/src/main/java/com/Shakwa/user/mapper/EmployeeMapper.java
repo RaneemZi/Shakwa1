@@ -17,6 +17,7 @@ public class EmployeeMapper {
         employee.setPassword(dto.getPassword());
         employee.setPhoneNumber(dto.getPhoneNumber());
         employee.setDateOfHire(dto.getDateOfHire());
+        employee.setStatus(dto.getStatus());
         // Don't set working hours here - will be handled in service after employee is saved
         // email and governmentAgency will be set in service
         return employee;
@@ -38,6 +39,10 @@ public class EmployeeMapper {
         if (dto.getDateOfHire() != null) {
             employee.setDateOfHire(dto.getDateOfHire());
         }
+
+        if (dto.getStatus() != null) {
+            employee.setStatus(dto.getStatus());
+        }
     }
 
     // Map from Employee entity to ResponseDTO
@@ -51,6 +56,7 @@ public class EmployeeMapper {
         dto.setPhoneNumber(entity.getPhoneNumber());
         dto.setDateOfHire(entity.getDateOfHire());
         dto.setRoleName(entity.getRole() != null ? entity.getRole().getName() : null);
+        dto.setStatus(entity.getStatus());
         dto.setGovernmentAgencyId(entity.getGovernmentAgency() != null ? (long) entity.getGovernmentAgency().ordinal() : null);
         
                      

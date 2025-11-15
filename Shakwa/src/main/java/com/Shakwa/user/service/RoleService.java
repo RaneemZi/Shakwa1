@@ -130,4 +130,15 @@ public class RoleService {
             .map(Optional::get)
             .collect(Collectors.toSet());
     }
+
+    /**
+     * Get roles available for employees (excludes PLATFORM_ADMIN)
+     * @return List of roles that can be assigned to employees (SUPERVISOR and VIEWER)
+     */
+    public List<Role> getEmployeeRoles() {
+        return roleRepository.findAll().stream()
+                .filter(role -> role.getName().equals("SUPERVISOR") || role.getName().equals("VIEWER"))
+                .filter(Role::isActive)
+                .collect(Collectors.toList());
+    }
 } 

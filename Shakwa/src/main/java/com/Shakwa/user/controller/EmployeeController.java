@@ -4,9 +4,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import com.Shakwa.user.dto.AuthenticationRequest;
 import com.Shakwa.user.dto.EmployeeCreateRequestDTO;
 import com.Shakwa.user.dto.EmployeeResponseDTO;
 import com.Shakwa.user.dto.EmployeeUpdateRequestDTO;
+import com.Shakwa.user.dto.UserAuthenticationResponse;
 import com.Shakwa.user.service.EmployeeService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -17,6 +19,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 
 import java.util.List;
@@ -130,6 +133,25 @@ public class EmployeeController {
         return ResponseEntity.noContent().build();
     }
     
-
+    @PostMapping("/login")
+    @Operation(
+        summary = "Employee login",
+        description = "Authenticates an employee using email and password set by platform admin. Returns a JWT token."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Login successful",
+            content = @Content(mediaType = "application/json",
+            schema = @Schema(implementation = UserAuthenticationResponse.class))),
+        @ApiResponse(responseCode = "401", description = "Invalid credentials or account not active"),
+        @ApiResponse(responseCode = "429", description = "Too many login attempts"),
+        @ApiResponse(responseCode = "500", description = "Internal server error")
+    })
+    public ResponseEntity<UserAuthenticationResponse> login(
+            @Parameter(description = "Login credentials", required = true)
+            @Valid @RequestBody AuthenticationRequest request,
+            HttpServletRequest httpServletRequest) {
+        UserAuthenticationResponse response = employeeService.login(request, httpServletRequest);
+        return ResponseEntity.ok(response);
+    }
  
 } 
