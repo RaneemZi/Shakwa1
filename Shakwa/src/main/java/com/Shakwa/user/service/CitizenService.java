@@ -254,13 +254,7 @@ public class CitizenService extends BaseSecurityService {
         // إرجاع response مع OTP (خاصة في وضع التطوير)
         CitizenDTOResponse response = citizenMapper.toResponse(citizen);
         
-        // إرجاع OTP في response فقط في وضع التطوير (mail.enabled=false)
-        // لأسباب أمنية، لا نرجع OTP في الإنتاج
-        if (!emailService.isMailEnabled()) {
-            response.setOtpCode(otpCode);
-            logger.info("OTP code included in response (development mode) for email: {}", dto.getEmail());
-        }
-        
+    
         return response;
     }
 

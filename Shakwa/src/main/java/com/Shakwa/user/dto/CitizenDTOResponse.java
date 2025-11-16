@@ -17,8 +17,9 @@ public class CitizenDTOResponse {
     
     @Schema(description = "Citizen name", example = "cash citizen")
     private String name;
-    
-    @Schema(description = "OTP code (only returned in development mode when mail.enabled=false)", example = "123456")
-    private String otpCode;
+
+    @Schema(description = "Citizen email", example = "cashcitizen@gmail.com")
+    private String email;
+
 
 }
