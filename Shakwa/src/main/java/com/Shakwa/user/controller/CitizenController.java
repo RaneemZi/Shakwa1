@@ -1,7 +1,5 @@
 package com.Shakwa.user.controller;
 
-import java.util.List;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -20,6 +18,7 @@ import com.Shakwa.user.dto.AuthenticationRequest;
 import com.Shakwa.user.dto.CitizenDTORequest;
 import com.Shakwa.user.dto.CitizenDTOResponse;
 import com.Shakwa.user.dto.OtpVerificationRequest;
+import com.Shakwa.user.dto.PaginationDTO;
 import com.Shakwa.user.dto.ResendOtpRequest;
 import com.Shakwa.user.dto.UserAuthenticationResponse;
 import com.Shakwa.user.service.CitizenService;
@@ -129,11 +128,16 @@ public class CitizenController {
     }
 
     @GetMapping
-    @Operation(summary = "Get all citizens", description = "Retrieve all citizens with their debt information")
-    public ResponseEntity<List<CitizenDTOResponse>> getAllCitizens() {
-        logger.info("Fetching all citizens");
-        List<CitizenDTOResponse> citizens = citizenService.getAllCitizens();
-        logger.info("Retrieved {} citizens", citizens.size());
+    @Operation(summary = "Get all citizens", description = "Retrieve all citizens with their debt information with pagination")
+    public ResponseEntity<PaginationDTO<CitizenDTOResponse>> getAllCitizens(
+            @Parameter(description = "Page number (0-indexed)", example = "0")
+            @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Page size", example = "10")
+            @RequestParam(defaultValue = "10") int size) {
+        logger.info("Fetching all citizens - page: {}, size: {}", page, size);
+        PaginationDTO<CitizenDTOResponse> citizens = citizenService.getAllCitizens(page, size);
+        logger.info("Retrieved {} citizens (page {} of {})", 
+                   citizens.getContent().size(), page, citizens.getTotalPages());
         return ResponseEntity.ok(citizens);
     }
 
@@ -149,14 +153,19 @@ public class CitizenController {
         return ResponseEntity.ok(citizen);
     }
 
-      @GetMapping("search")
-    @Operation(summary = "Search citizens by name", description = "Search citizens by name (partial match)")
-    public ResponseEntity<List<CitizenDTOResponse>> searchCitizensByName(
+    @GetMapping("search")
+    @Operation(summary = "Search citizens by name", description = "Search citizens by name (partial match) with pagination")
+    public ResponseEntity<PaginationDTO<CitizenDTOResponse>> searchCitizensByName(
             @Parameter(description = "Citizen name to search for", example = "cash") 
-            @RequestParam(required = false) String name) {
-        logger.info("Searching citizens with name: {}", name);
-        List<CitizenDTOResponse> citizens = citizenService.searchCitizensByName(name);
-        logger.info("Found {} citizens matching search criteria", citizens.size());
+            @RequestParam(required = false) String name,
+            @Parameter(description = "Page number (0-indexed)", example = "0")
+            @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Page size", example = "10")
+            @RequestParam(defaultValue = "10") int size) {
+        logger.info("Searching citizens with name: {} - page: {}, size: {}", name, page, size);
+        PaginationDTO<CitizenDTOResponse> citizens = citizenService.searchCitizensByName(name, page, size);
+        logger.info("Found {} citizens matching search criteria (page {} of {})", 
+                   citizens.getContent().size(), page, citizens.getTotalPages());
         return ResponseEntity.ok(citizens);
     }
 

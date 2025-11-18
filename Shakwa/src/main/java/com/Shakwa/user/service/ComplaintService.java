@@ -1,14 +1,18 @@
 package com.Shakwa.user.service;
 
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+
+import jakarta.persistence.criteria.Predicate;
 
 import com.Shakwa.user.Enum.ComplaintStatus;
 import com.Shakwa.user.Enum.ComplaintType;
@@ -16,6 +20,7 @@ import com.Shakwa.user.Enum.GovernmentAgencyType;
 import com.Shakwa.user.Enum.Governorate;
 import com.Shakwa.user.dto.ComplaintDTORequest;
 import com.Shakwa.user.dto.ComplaintDTOResponse;
+import com.Shakwa.user.dto.PaginationDTO;
 import com.Shakwa.user.entity.Citizen;
 import com.Shakwa.user.entity.Complaint;
 import com.Shakwa.user.entity.Employee;
@@ -83,43 +88,42 @@ public class ComplaintService extends BaseSecurityService {
     /**
      * الحصول على جميع الشكاوى - للموظفين (حسب جهتهم الحكومية) أو المواطن (شكاويه فقط)
      */
-    public List<ComplaintDTOResponse> getAllComplaints() {
+    public PaginationDTO<ComplaintDTOResponse> getAllComplaints(int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        Page<Complaint> complaintPage;
+
         // إذا كان المستخدم الحالي مواطن، إرجاع شكاويه فقط
         if (isCurrentUserCitizen()) {
             Citizen currentCitizen = getCurrentCitizen();
             logger.info("Citizen {} (ID: {}) is fetching their complaints", 
                        currentCitizen.getEmail(), currentCitizen.getId());
-            return complaintRepository.findByCitizenId(currentCitizen.getId())
-                    .stream()
-                    .map(complaintMapper::toResponse)
-                    .collect(Collectors.toList());
+            complaintPage = complaintRepository.findByCitizenId(currentCitizen.getId(), pageable);
         }
-
         // إذا كان موظف، إرجاع شكاوى جهته الحكومية فقط
-        try {
-            User currentUser = getCurrentUser();
-            if (currentUser instanceof Employee employee) {
-                if (employee.getGovernmentAgency() == null) {
-                    throw new UnAuthorizedException("Employee is not associated with any government agency");
+        else {
+            try {
+                User currentUser = getCurrentUser();
+                if (currentUser instanceof Employee employee) {
+                    if (employee.getGovernmentAgency() == null) {
+                        throw new UnAuthorizedException("Employee is not associated with any government agency");
+                    }
+                    GovernmentAgencyType governmentAgency = employee.getGovernmentAgency();
+                    logger.info("Employee {} (ID: {}) is fetching complaints for agency: {}", 
+                               currentUser.getEmail(), currentUser.getId(), governmentAgency);
+                    complaintPage = complaintRepository.findByGovernmentAgency(governmentAgency, pageable);
+                } else {
+                    // إذا لم يكن موظف أو مواطن، إرجاع جميع الشكاوى (للمدير العام)
+                    logger.info("Admin is fetching all complaints");
+                    complaintPage = complaintRepository.findAll(pageable);
                 }
-                GovernmentAgencyType governmentAgency = employee.getGovernmentAgency();
-                logger.info("Employee {} (ID: {}) is fetching complaints for agency: {}", 
-                           currentUser.getEmail(), currentUser.getId(), governmentAgency);
-                return complaintRepository.findByGovernmentAgency(governmentAgency)
-                        .stream()
-                        .map(complaintMapper::toResponse)
-                        .collect(Collectors.toList());
+            } catch (Exception e) {
+                logger.warn("Could not get current user, assuming admin access: {}", e.getMessage());
+                complaintPage = complaintRepository.findAll(pageable);
             }
-        } catch (Exception e) {
-            logger.warn("Could not get current user, assuming admin access: {}", e.getMessage());
         }
 
-        // إذا لم يكن موظف أو مواطن، إرجاع جميع الشكاوى (للمدير العام)
-        logger.info("Admin is fetching all complaints");
-        return complaintRepository.findAll()
-                .stream()
-                .map(complaintMapper::toResponse)
-                .collect(Collectors.toList());
+        Page<ComplaintDTOResponse> dtoPage = complaintPage.map(complaintMapper::toResponse);
+        return PaginationDTO.of(dtoPage);
     }
 
     /**
@@ -165,8 +169,10 @@ public class ComplaintService extends BaseSecurityService {
     /**
      * الحصول على شكاوى مواطن محدد
      */
-    public List<ComplaintDTOResponse> getComplaintsByCitizenId(Long citizenId) {
+    public PaginationDTO<ComplaintDTOResponse> getComplaintsByCitizenId(Long citizenId, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
         User currentUser = getCurrentUser();
+        Page<Complaint> complaintPage;
 
         // التحقق من الصلاحيات
         if (currentUser instanceof Employee employee) {
@@ -174,39 +180,35 @@ public class ComplaintService extends BaseSecurityService {
                 throw new UnAuthorizedException("Employee is not associated with any government agency");
             }
             GovernmentAgencyType governmentAgency = employee.getGovernmentAgency();
-            return complaintRepository.findByCitizenIdAndGovernmentAgency(citizenId, governmentAgency)
-                    .stream()
-                    .map(complaintMapper::toResponse)
-                    .collect(Collectors.toList());
+            complaintPage = complaintRepository.findByCitizenIdAndGovernmentAgency(citizenId, governmentAgency, pageable);
+        } else {
+            complaintPage = complaintRepository.findByCitizenId(citizenId, pageable);
         }
 
-        return complaintRepository.findByCitizenId(citizenId)
-                .stream()
-                .map(complaintMapper::toResponse)
-                .collect(Collectors.toList());
+        Page<ComplaintDTOResponse> dtoPage = complaintPage.map(complaintMapper::toResponse);
+        return PaginationDTO.of(dtoPage);
     }
 
     /**
      * الحصول على الشكاوى حسب الحالة
      */
-    public List<ComplaintDTOResponse> getComplaintsByStatus(ComplaintStatus status) {
+    public PaginationDTO<ComplaintDTOResponse> getComplaintsByStatus(ComplaintStatus status, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
         User currentUser = getCurrentUser();
+        Page<Complaint> complaintPage;
 
         if (currentUser instanceof Employee employee) {
             if (employee.getGovernmentAgency() == null) {
                 throw new UnAuthorizedException("Employee is not associated with any government agency");
             }
             GovernmentAgencyType governmentAgency = employee.getGovernmentAgency();
-            return complaintRepository.findByGovernmentAgencyAndStatus(governmentAgency, status)
-                    .stream()
-                    .map(complaintMapper::toResponse)
-                    .collect(Collectors.toList());
+            complaintPage = complaintRepository.findByGovernmentAgencyAndStatus(governmentAgency, status, pageable);
+        } else {
+            complaintPage = complaintRepository.findByStatus(status, pageable);
         }
 
-        return complaintRepository.findByStatus(status)
-                .stream()
-                .map(complaintMapper::toResponse)
-                .collect(Collectors.toList());
+        Page<ComplaintDTOResponse> dtoPage = complaintPage.map(complaintMapper::toResponse);
+        return PaginationDTO.of(dtoPage);
     }
 
     /**
@@ -300,47 +302,45 @@ public class ComplaintService extends BaseSecurityService {
     /**
      * البحث عن الشكاوى حسب نوع الشكوى
      */
-    public List<ComplaintDTOResponse> getComplaintsByType(ComplaintType complaintType) {
+    public PaginationDTO<ComplaintDTOResponse> getComplaintsByType(ComplaintType complaintType, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
         User currentUser = getCurrentUser();
+        Page<Complaint> complaintPage;
 
         if (currentUser instanceof Employee employee) {
             if (employee.getGovernmentAgency() == null) {
                 throw new UnAuthorizedException("Employee is not associated with any government agency");
             }
             GovernmentAgencyType governmentAgency = employee.getGovernmentAgency();
-            return complaintRepository.findByGovernmentAgencyAndComplaintType(governmentAgency, complaintType)
-                    .stream()
-                    .map(complaintMapper::toResponse)
-                    .collect(Collectors.toList());
+            complaintPage = complaintRepository.findByGovernmentAgencyAndComplaintType(governmentAgency, complaintType, pageable);
+        } else {
+            complaintPage = complaintRepository.findByComplaintType(complaintType, pageable);
         }
 
-        return complaintRepository.findByComplaintType(complaintType)
-                .stream()
-                .map(complaintMapper::toResponse)
-                .collect(Collectors.toList());
+        Page<ComplaintDTOResponse> dtoPage = complaintPage.map(complaintMapper::toResponse);
+        return PaginationDTO.of(dtoPage);
     }
 
     /**
      * البحث عن الشكاوى حسب المحافظة
      */
-    public List<ComplaintDTOResponse> getComplaintsByGovernorate(Governorate governorate) {
+    public PaginationDTO<ComplaintDTOResponse> getComplaintsByGovernorate(Governorate governorate, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
         User currentUser = getCurrentUser();
+        Page<Complaint> complaintPage;
 
         if (currentUser instanceof Employee employee) {
             if (employee.getGovernmentAgency() == null) {
                 throw new UnAuthorizedException("Employee is not associated with any government agency");
             }
             GovernmentAgencyType governmentAgency = employee.getGovernmentAgency();
-            return complaintRepository.findByGovernmentAgencyAndGovernorate(governmentAgency, governorate)
-                    .stream()
-                    .map(complaintMapper::toResponse)
-                    .collect(Collectors.toList());
+            complaintPage = complaintRepository.findByGovernmentAgencyAndGovernorate(governmentAgency, governorate, pageable);
+        } else {
+            complaintPage = complaintRepository.findByGovernorate(governorate, pageable);
         }
 
-        return complaintRepository.findByGovernorate(governorate)
-                .stream()
-                .map(complaintMapper::toResponse)
-                .collect(Collectors.toList());
+        Page<ComplaintDTOResponse> dtoPage = complaintPage.map(complaintMapper::toResponse);
+        return PaginationDTO.of(dtoPage);
     }
 
     /**
@@ -374,6 +374,68 @@ public class ComplaintService extends BaseSecurityService {
         // citizenId ليس مطلوباً إذا كان المستخدم الحالي مواطن (سيتم أخذه من الـ token)
         // ولكن مطلوب إذا كان موظف يقوم بإنشاء شكوى لمواطن آخر
         // يتم التحقق من ذلك في createComplaint() method
+    }
+
+    /**
+     * فلترة الشكاوى حسب معايير متعددة
+     */
+    public PaginationDTO<ComplaintDTOResponse> filterComplaints(
+            ComplaintStatus status,
+            ComplaintType complaintType,
+            Governorate governorate,
+            GovernmentAgencyType governmentAgency,
+            Long citizenId,
+            int page,
+            int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        
+        Specification<Complaint> spec = (root, query, cb) -> {
+            Predicate predicate = cb.conjunction();
+
+            // فلترة حسب الحالة
+            if (status != null) {
+                predicate = cb.and(predicate, cb.equal(root.get("status"), status));
+            }
+
+            // فلترة حسب نوع الشكوى
+            if (complaintType != null) {
+                predicate = cb.and(predicate, cb.equal(root.get("complaintType"), complaintType));
+            }
+
+            // فلترة حسب المحافظة
+            if (governorate != null) {
+                predicate = cb.and(predicate, cb.equal(root.get("governorate"), governorate));
+            }
+
+            // فلترة حسب الجهة الحكومية
+            if (governmentAgency != null) {
+                predicate = cb.and(predicate, cb.equal(root.get("governmentAgency"), governmentAgency));
+            }
+
+            // فلترة حسب المواطن
+            if (citizenId != null) {
+                predicate = cb.and(predicate, cb.equal(root.get("citizen").get("id"), citizenId));
+            }
+
+            // التحقق من الصلاحيات
+            User currentUser = getCurrentUser();
+            if (currentUser instanceof Employee employee) {
+                if (employee.getGovernmentAgency() != null) {
+                    // الموظف يرى فقط شكاوى جهته الحكومية
+                    predicate = cb.and(predicate, cb.equal(root.get("governmentAgency"), employee.getGovernmentAgency()));
+                }
+            } else if (isCurrentUserCitizen()) {
+                // المواطن يرى فقط شكاويه
+                Citizen currentCitizen = getCurrentCitizen();
+                predicate = cb.and(predicate, cb.equal(root.get("citizen").get("id"), currentCitizen.getId()));
+            }
+
+            return predicate;
+        };
+
+        Page<Complaint> complaintPage = complaintRepository.findAll(spec, pageable);
+        Page<ComplaintDTOResponse> dtoPage = complaintPage.map(complaintMapper::toResponse);
+        return PaginationDTO.of(dtoPage);
     }
 }
 

@@ -1,7 +1,5 @@
 package com.Shakwa.user.controller;
 
-import java.util.List;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -17,9 +15,11 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.Shakwa.user.Enum.ComplaintStatus;
 import com.Shakwa.user.Enum.ComplaintType;
+import com.Shakwa.user.Enum.GovernmentAgencyType;
 import com.Shakwa.user.Enum.Governorate;
 import com.Shakwa.user.dto.ComplaintDTORequest;
 import com.Shakwa.user.dto.ComplaintDTOResponse;
+import com.Shakwa.user.dto.PaginationDTO;
 import com.Shakwa.user.service.ComplaintService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -40,11 +40,16 @@ public class ComplaintController {
     }
 
     @GetMapping
-    @Operation(summary = "Get all complaints", description = "Retrieve all complaints based on user role (employee sees only their agency's complaints)")
-    public ResponseEntity<List<ComplaintDTOResponse>> getAllComplaints() {
-        logger.info("Fetching all complaints");
-        List<ComplaintDTOResponse> complaints = complaintService.getAllComplaints();
-        logger.info("Retrieved {} complaints", complaints.size());
+    @Operation(summary = "Get all complaints", description = "Retrieve all complaints based on user role (employee sees only their agency's complaints) with pagination")
+    public ResponseEntity<PaginationDTO<ComplaintDTOResponse>> getAllComplaints(
+            @Parameter(description = "Page number (0-indexed)", example = "0")
+            @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Page size", example = "10")
+            @RequestParam(defaultValue = "10") int size) {
+        logger.info("Fetching all complaints - page: {}, size: {}", page, size);
+        PaginationDTO<ComplaintDTOResponse> complaints = complaintService.getAllComplaints(page, size);
+        logger.info("Retrieved {} complaints (page {} of {})", 
+                   complaints.getContent().size(), page, complaints.getTotalPages());
         return ResponseEntity.ok(complaints);
     }
 
@@ -60,46 +65,95 @@ public class ComplaintController {
     }
 
     @GetMapping("citizen/{citizenId}")
-    @Operation(summary = "Get complaints by citizen ID", description = "Retrieve all complaints for a specific citizen")
-    public ResponseEntity<List<ComplaintDTOResponse>> getComplaintsByCitizenId(
+    @Operation(summary = "Get complaints by citizen ID", description = "Retrieve all complaints for a specific citizen with pagination")
+    public ResponseEntity<PaginationDTO<ComplaintDTOResponse>> getComplaintsByCitizenId(
             @Parameter(description = "Citizen ID", example = "1") 
-            @PathVariable Long citizenId) {
-        logger.info("Fetching complaints for citizen ID: {}", citizenId);
-        List<ComplaintDTOResponse> complaints = complaintService.getComplaintsByCitizenId(citizenId);
-        logger.info("Retrieved {} complaints for citizen ID: {}", complaints.size(), citizenId);
+            @PathVariable Long citizenId,
+            @Parameter(description = "Page number (0-indexed)", example = "0")
+            @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Page size", example = "10")
+            @RequestParam(defaultValue = "10") int size) {
+        logger.info("Fetching complaints for citizen ID: {} - page: {}, size: {}", citizenId, page, size);
+        PaginationDTO<ComplaintDTOResponse> complaints = complaintService.getComplaintsByCitizenId(citizenId, page, size);
+        logger.info("Retrieved {} complaints for citizen ID: {} (page {} of {})", 
+                   complaints.getContent().size(), citizenId, page, complaints.getTotalPages());
         return ResponseEntity.ok(complaints);
     }
 
     @GetMapping("status/{status}")
-    @Operation(summary = "Get complaints by status", description = "Retrieve all complaints with a specific status")
-    public ResponseEntity<List<ComplaintDTOResponse>> getComplaintsByStatus(
+    @Operation(summary = "Get complaints by status", description = "Retrieve all complaints with a specific status with pagination")
+    public ResponseEntity<PaginationDTO<ComplaintDTOResponse>> getComplaintsByStatus(
             @Parameter(description = "Complaint status", example = "PENDING") 
-            @PathVariable ComplaintStatus status) {
-        logger.info("Fetching complaints with status: {}", status);
-        List<ComplaintDTOResponse> complaints = complaintService.getComplaintsByStatus(status);
-        logger.info("Retrieved {} complaints with status: {}", complaints.size(), status);
+            @PathVariable ComplaintStatus status,
+            @Parameter(description = "Page number (0-indexed)", example = "0")
+            @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Page size", example = "10")
+            @RequestParam(defaultValue = "10") int size) {
+        logger.info("Fetching complaints with status: {} - page: {}, size: {}", status, page, size);
+        PaginationDTO<ComplaintDTOResponse> complaints = complaintService.getComplaintsByStatus(status, page, size);
+        logger.info("Retrieved {} complaints with status: {} (page {} of {})", 
+                   complaints.getContent().size(), status, page, complaints.getTotalPages());
         return ResponseEntity.ok(complaints);
     }
 
     @GetMapping("type/{complaintType}")
-    @Operation(summary = "Get complaints by type", description = "Retrieve all complaints of a specific type")
-    public ResponseEntity<List<ComplaintDTOResponse>> getComplaintsByType(
+    @Operation(summary = "Get complaints by type", description = "Retrieve all complaints of a specific type with pagination")
+    public ResponseEntity<PaginationDTO<ComplaintDTOResponse>> getComplaintsByType(
             @Parameter(description = "Complaint type", example = "تأخر_في_إنجاز_معاملة") 
-            @PathVariable ComplaintType complaintType) {
-        logger.info("Fetching complaints with type: {}", complaintType);
-        List<ComplaintDTOResponse> complaints = complaintService.getComplaintsByType(complaintType);
-        logger.info("Retrieved {} complaints with type: {}", complaints.size(), complaintType);
+            @PathVariable ComplaintType complaintType,
+            @Parameter(description = "Page number (0-indexed)", example = "0")
+            @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Page size", example = "10")
+            @RequestParam(defaultValue = "10") int size) {
+        logger.info("Fetching complaints with type: {} - page: {}, size: {}", complaintType, page, size);
+        PaginationDTO<ComplaintDTOResponse> complaints = complaintService.getComplaintsByType(complaintType, page, size);
+        logger.info("Retrieved {} complaints with type: {} (page {} of {})", 
+                   complaints.getContent().size(), complaintType, page, complaints.getTotalPages());
         return ResponseEntity.ok(complaints);
     }
 
     @GetMapping("governorate/{governorate}")
-    @Operation(summary = "Get complaints by governorate", description = "Retrieve all complaints from a specific governorate")
-    public ResponseEntity<List<ComplaintDTOResponse>> getComplaintsByGovernorate(
+    @Operation(summary = "Get complaints by governorate", description = "Retrieve all complaints from a specific governorate with pagination")
+    public ResponseEntity<PaginationDTO<ComplaintDTOResponse>> getComplaintsByGovernorate(
             @Parameter(description = "Governorate", example = "دمشق") 
-            @PathVariable Governorate governorate) {
-        logger.info("Fetching complaints for governorate: {}", governorate);
-        List<ComplaintDTOResponse> complaints = complaintService.getComplaintsByGovernorate(governorate);
-        logger.info("Retrieved {} complaints for governorate: {}", complaints.size(), governorate);
+            @PathVariable Governorate governorate,
+            @Parameter(description = "Page number (0-indexed)", example = "0")
+            @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Page size", example = "10")
+            @RequestParam(defaultValue = "10") int size) {
+        logger.info("Fetching complaints for governorate: {} - page: {}, size: {}", governorate, page, size);
+        PaginationDTO<ComplaintDTOResponse> complaints = complaintService.getComplaintsByGovernorate(governorate, page, size);
+        logger.info("Retrieved {} complaints for governorate: {} (page {} of {})", 
+                   complaints.getContent().size(), governorate, page, complaints.getTotalPages());
+        return ResponseEntity.ok(complaints);
+    }
+
+    @GetMapping("filter")
+    @Operation(
+        summary = "Filter complaints", 
+        description = "Filter complaints by multiple criteria (status, type, governorate, government agency, citizen ID) with pagination. All filters are optional."
+    )
+    public ResponseEntity<PaginationDTO<ComplaintDTOResponse>> filterComplaints(
+            @Parameter(description = "Complaint status", example = "PENDING")
+            @RequestParam(required = false) ComplaintStatus status,
+            @Parameter(description = "Complaint type", example = "تأخر_في_إنجاز_معاملة")
+            @RequestParam(required = false) ComplaintType complaintType,
+            @Parameter(description = "Governorate", example = "دمشق")
+            @RequestParam(required = false) Governorate governorate,
+            @Parameter(description = "Government agency", example = "وزارة_الصحة")
+            @RequestParam(required = false) GovernmentAgencyType governmentAgency,
+            @Parameter(description = "Citizen ID", example = "1")
+            @RequestParam(required = false) Long citizenId,
+            @Parameter(description = "Page number (0-indexed)", example = "0")
+            @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Page size", example = "10")
+            @RequestParam(defaultValue = "10") int size) {
+        logger.info("Filtering complaints - status: {}, type: {}, governorate: {}, agency: {}, citizenId: {}, page: {}, size: {}", 
+                   status, complaintType, governorate, governmentAgency, citizenId, page, size);
+        PaginationDTO<ComplaintDTOResponse> complaints = complaintService.filterComplaints(
+            status, complaintType, governorate, governmentAgency, citizenId, page, size);
+        logger.info("Retrieved {} filtered complaints (page {} of {})", 
+                   complaints.getContent().size(), page, complaints.getTotalPages());
         return ResponseEntity.ok(complaints);
     }
 

@@ -2,9 +2,7 @@ package com.Shakwa.user.service;
 
 import java.security.SecureRandom;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,6 +10,9 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -21,6 +22,7 @@ import com.Shakwa.config.RateLimiterConfig;
 import com.Shakwa.user.dto.AuthenticationRequest;
 import com.Shakwa.user.dto.CitizenDTORequest;
 import com.Shakwa.user.dto.CitizenDTOResponse;
+import com.Shakwa.user.dto.PaginationDTO;
 import com.Shakwa.user.dto.UserAuthenticationResponse;
 import com.Shakwa.user.entity.Citizen;
 import com.Shakwa.user.entity.Employee;
@@ -76,17 +78,17 @@ public class CitizenService extends BaseSecurityService {
         this.otpRepository = otpRepository;
     }
 
-    public List<CitizenDTOResponse> getAllCitizens() {
+    public PaginationDTO<CitizenDTOResponse> getAllCitizens(int page, int size) {
         User currentUser = getCurrentUser();
         // السماح للأدمن والموظفين بالوصول
         if (!isAdmin() && !(currentUser instanceof Employee)) {
             throw new UnAuthorizedException("Only platform admins and governmentAgency employees can access citizens");
         }
         
-        return citizenRepo.findAll()
-                .stream()
-                .map(citizenMapper::toResponse)
-                .collect(Collectors.toList());
+        Pageable pageable = PageRequest.of(page, size);
+        Page<Citizen> citizensPage = citizenRepo.findAll(pageable);
+        Page<CitizenDTOResponse> dtoPage = citizensPage.map(citizenMapper::toResponse);
+        return PaginationDTO.of(dtoPage);
     }
     
     public CitizenDTOResponse getCitizenById(Long id) {
@@ -117,24 +119,24 @@ public class CitizenService extends BaseSecurityService {
         return citizenMapper.toResponse(citizen);
     }
 
-    public List<CitizenDTOResponse> searchCitizensByName(String name) {
+    public PaginationDTO<CitizenDTOResponse> searchCitizensByName(String name, int page, int size) {
         User currentUser = getCurrentUser();
         // السماح للأدمن والموظفين بالوصول
         if (!isAdmin() && !(currentUser instanceof Employee)) {
             throw new UnAuthorizedException("Only platform admins and governmentAgency employees can access citizens");
         }
         
+        Pageable pageable = PageRequest.of(page, size);
+        Page<Citizen> citizensPage;
+        
         if (!StringUtils.hasText(name)) {
-            return citizenRepo.findAll()
-                    .stream()
-                    .map(citizenMapper::toResponse)
-                    .collect(Collectors.toList());
+            citizensPage = citizenRepo.findAll(pageable);
+        } else {
+            citizensPage = citizenRepo.findByNameContainingIgnoreCase(name, pageable);
         }
         
-        return citizenRepo.findByNameContainingIgnoreCase(name)
-                .stream()
-                .map(citizenMapper::toResponse)
-                .collect(Collectors.toList());
+        Page<CitizenDTOResponse> dtoPage = citizensPage.map(citizenMapper::toResponse);
+        return PaginationDTO.of(dtoPage);
     }
 
     public CitizenDTOResponse createCitizen(CitizenDTORequest dto) {
