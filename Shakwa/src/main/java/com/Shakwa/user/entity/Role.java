@@ -19,6 +19,11 @@ import com.Shakwa.utils.entity.BaseEntity;
 @SequenceGenerator(name = "role_seq", sequenceName = "roles_id_seq", allocationSize = 1)
 public class Role extends BaseEntity {
     
+    @Override
+    protected String getSequenceName() {
+        return "roles_id_seq";
+    }
+    
     @Column(nullable = false, unique = true)
     private String name;
     

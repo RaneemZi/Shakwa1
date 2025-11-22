@@ -4,6 +4,9 @@ import java.security.SecureRandom;
 import java.util.HashSet;
 import java.util.Optional;
 
+import com.Shakwa.user.Enum.UserStatus;
+import com.Shakwa.user.repository.EmployeeRepository;
+import com.Shakwa.utils.exception.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -32,10 +35,6 @@ import com.Shakwa.user.mapper.CitizenMapper;
 import com.Shakwa.user.repository.CitizenRepo;
 import com.Shakwa.user.repository.OtpVerificationRepository;
 import com.Shakwa.user.repository.UserRepository;
-import com.Shakwa.utils.exception.ConflictException;
-import com.Shakwa.utils.exception.RequestNotValidException;
-import com.Shakwa.utils.exception.TooManyRequestException;
-import com.Shakwa.utils.exception.UnAuthorizedException;
 
 import io.github.resilience4j.ratelimiter.RateLimiter;
 import io.github.resilience4j.ratelimiter.RateLimiterRegistry;
@@ -56,17 +55,18 @@ public class CitizenService extends BaseSecurityService {
     private final EmailService emailService;
     private final OtpVerificationRepository otpRepository;
     private static final SecureRandom random = new SecureRandom();
+    private final EmployeeRepository employeeRepository;
 
-    public CitizenService(CitizenRepo citizenRepo, CitizenMapper citizenMapper, 
-                         UserRepository userRepository,
-                         PasswordEncoder passwordEncoder,
-                         JwtService jwtService,
-                         RateLimiterConfig rateLimiterConfig,
-                         RateLimiterRegistry rateLimiterRegistry,
-                         AuthenticationManager authenticationManager,
-                         EmailService emailService,
-                         OtpVerificationRepository otpRepository) {
-        super(userRepository, citizenRepo);
+    public CitizenService(CitizenRepo citizenRepo, CitizenMapper citizenMapper,
+                          UserRepository userRepository,
+                          PasswordEncoder passwordEncoder,
+                          JwtService jwtService,
+                          RateLimiterConfig rateLimiterConfig,
+                          RateLimiterRegistry rateLimiterRegistry,
+                          AuthenticationManager authenticationManager,
+                          EmailService emailService,
+                          OtpVerificationRepository otpRepository, EmployeeRepository employeeRepository) {
+        super(userRepository, citizenRepo ,employeeRepository);
         this.citizenRepo = citizenRepo;
         this.citizenMapper = citizenMapper;
         this.passwordEncoder = passwordEncoder;
@@ -76,6 +76,7 @@ public class CitizenService extends BaseSecurityService {
         this.authenticationManager = authenticationManager;
         this.emailService = emailService;
         this.otpRepository = otpRepository;
+        this.employeeRepository = employeeRepository;
     }
 
     public PaginationDTO<CitizenDTOResponse> getAllCitizens(int page, int size) {
@@ -264,8 +265,11 @@ public class CitizenService extends BaseSecurityService {
      * التحقق من OTP وتفعيل الحساب
      */
     public void verifyOtp(String email, String otpCode) {
+        Citizen citizen = citizenRepo.findByEmail(email).orElseThrow(
+                () -> new ResourceNotFoundException("Citizen with email " + email + " not found")
+        );
         Optional<OtpVerification> otpOptional = otpRepository.findByEmail(email);
-        
+
         if (otpOptional.isEmpty()) {
             throw new RequestNotValidException("OTP not found. Please request a new OTP.");
         }
@@ -297,6 +301,7 @@ public class CitizenService extends BaseSecurityService {
         
         // بعد التحقق الناجح، يمكن حذف OTP أو تركه للتنظيف التلقائي
         otpRepository.delete(otp);
+        citizen.setStatus(UserStatus.ACTIVE);
     }
 
     /**

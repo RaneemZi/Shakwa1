@@ -20,8 +20,8 @@ import io.swagger.v3.oas.annotations.servers.Server;
                         name = "Wassem Tenbakji" ,
                         email = "wasee.tenbakji@gmail.com"
                 ),
-                description = "open api documentation for Teryaq governmentAgency management system.",
-                title = "Teryaq governmentAgency management system",
+                description = "open api documentation for Mithaq government Agency management system.",
+                title = "Mithaq Government Agency management system",
                 version = "1.0",
                 license = @License(
                         name = "All Copyrights reserved to Wassem Tenbakji",
@@ -33,11 +33,11 @@ import io.swagger.v3.oas.annotations.servers.Server;
                 {
                         @Server(
                                 description = "Prod ENV",
-                                url = "https://d6d275ca4817.ngrok-free.app"
+                                url = "http://89.116.236.10:3200"
                         ),
                         @Server(
                                 description = "Local ENV",
-                                url = "http://localhost:3000"
+                                url = "http://localhost:13000"
                         )
                 },
         security = @SecurityRequirement(name = "BearerAuth")

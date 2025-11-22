@@ -1,5 +1,6 @@
 package com.Shakwa.user.service;
 
+import com.Shakwa.user.repository.EmployeeRepository;
 import org.springframework.stereotype.Service;
 
 import com.Shakwa.user.entity.User;
@@ -9,9 +10,9 @@ import com.Shakwa.user.repository.UserRepository;
 @Service("authz")
 public class SecurityExpressionService extends BaseSecurityService {
 
-    
-    public SecurityExpressionService(UserRepository userRepository, CitizenRepo citizenRepo) {
-        super(userRepository, citizenRepo);
+
+    public SecurityExpressionService(UserRepository userRepository, CitizenRepo citizenRepo, EmployeeRepository employeeRepository) {
+        super(userRepository, citizenRepo , employeeRepository);
     }
 
     /**

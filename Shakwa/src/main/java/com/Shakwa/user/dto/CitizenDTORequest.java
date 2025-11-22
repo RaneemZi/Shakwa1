@@ -1,5 +1,6 @@
 package com.Shakwa.user.dto;
 
+import com.Shakwa.utils.annotation.ValidPassword;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -12,13 +13,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
-@Schema(description = "Citizen Request", example = """
-{
-  "name": "John Doe",
-  "email": "john.doe@example.com",
-  "password": "Password123!",
-}
-""")
+@Schema(description = "Citizen Request")
 public class CitizenDTORequest {
  
     @Schema(description = "Name of the citizen", example = "John Doe")
@@ -26,12 +21,12 @@ public class CitizenDTORequest {
     private String name;
 
     @Schema(description = "Email address (required for registration)", example = "john.doe@example.com")
+    @NotBlank
     private String email;
 
     @Schema(description = "Password (required for registration)", example = "Password123!")
+    @ValidPassword
     private String password;
-
-
 
     // @Builder.Default
     // private boolean isActive = true;

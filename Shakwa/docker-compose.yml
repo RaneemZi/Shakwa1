@@ -1,0 +1,78 @@
+version: '3.8'
+# You can just enable docker for psql database, Or run whole project on docker container
+
+# Database service
+services:
+  mithaq-db:
+    image: postgres:latest
+    container_name: mithaq-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: mithaq
+      PGDATA: /var/lib/postgresql/data # Internal path where Postgres stores data
+    ports:
+      - "5444:5432" # Maps container port 5432 to host port 5444 (optional for direct access)
+    networks:
+      - mithaq-net
+    restart: unless-stopped
+    # Resource limits to prevent CPU thrashing and memory issues
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    volumes:
+      # Named Volume for Persistent Database Data (CRUCIAL FOR DATA PERSISTENCE & RESTORATION)
+      - mithaq_pg_data:/var/lib/postgresql/data # Maps internal PGDATA to a named Docker volume
+    healthcheck: # IMPORTANT: This ensures the DB is truly ready before apps connect
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s # Give the DB some initial time to come up
+
+  # application service
+  mithaq-app:
+    build: . # Builds the Docker image from the Dockerfile in the current directory
+    image: mithaq-app # Name for your built Docker image
+    depends_on:
+      # mithaq-app will start ONLY AFTER mithaq-db is healthy
+      mithaq-db:
+        condition: service_healthy
+    container_name: mithaq-backend
+    ports:
+      - "3200:3000" # Maps container port 3000 to host port 3200
+    environment:
+      # Database connection details, using the Docker Compose service name 'mithaq-db' as the hostname
+      SPRING_DATASOURCE_URL: jdbc:postgresql://mithaq-db:5432/mithaq
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: password
+      SPRING_DATASOURCE_DATABASE: mithaq
+      # Disable Flyway to prevent migration issues
+      SPRING_FLYWAY_ENABLED: "false"
+      # JVM memory settings to prevent memory leaks
+      JAVA_OPTS: "-Xmx768m -Xms256m"
+    networks:
+      - mithaq-net # Connects to the shared network
+    restart: unless-stopped
+    # Resource limits to prevent CPU thrashing and memory issues
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1024M
+        reservations:
+          cpus: '0.25'
+          memory: 512M
+
+networks:
+  mithaq-net:
+    driver: bridge
+
+# Define the named volume for data persistence
+volumes:
+  mithaq_pg_data: # This is the named volume that Docker manages on your host

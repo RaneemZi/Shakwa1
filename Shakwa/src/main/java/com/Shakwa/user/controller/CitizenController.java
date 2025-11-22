@@ -1,7 +1,5 @@
 package com.Shakwa.user.controller;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -40,11 +38,9 @@ import jakarta.validation.Valid;
 public class CitizenController {
 
     private final CitizenService citizenService;
-    private static final Logger logger = LoggerFactory.getLogger(CitizenController.class);
 
     public CitizenController(CitizenService citizenService) {
         this.citizenService = citizenService;
-        logger.info("CitizenController initialized successfully");
     }
 
     @PostMapping("/register")
@@ -62,9 +58,7 @@ public class CitizenController {
     })
     public ResponseEntity<CitizenDTOResponse> register(
             @Valid @RequestBody CitizenDTORequest dto) {
-        logger.info("Registering new citizen with email: {}", dto.getEmail());
         CitizenDTOResponse citizen = citizenService.register(dto);
-        logger.info("Successfully registered citizen with ID: {}", citizen.getId());
         return ResponseEntity.ok(citizen);
     }
 
@@ -81,9 +75,7 @@ public class CitizenController {
     })
     public ResponseEntity<String> verifyOtp(
             @Valid @RequestBody OtpVerificationRequest request) {
-        logger.info("Verifying OTP for email: {}", request.getEmail());
         citizenService.verifyOtp(request.getEmail(), request.getOtpCode());
-        logger.info("OTP verified successfully for email: {}", request.getEmail());
         return ResponseEntity.ok("Email verified successfully. You can now login.");
     }
 
@@ -99,9 +91,7 @@ public class CitizenController {
     })
     public ResponseEntity<String> resendOtp(
             @Valid @RequestBody ResendOtpRequest request) {
-        logger.info("Resending OTP for email: {}", request.getEmail());
         citizenService.resendOtp(request.getEmail());
-        logger.info("OTP resent successfully for email: {}", request.getEmail());
         return ResponseEntity.ok("OTP code has been sent to your email.");
     }
 
@@ -121,9 +111,7 @@ public class CitizenController {
     public ResponseEntity<UserAuthenticationResponse> login(
             @Valid @RequestBody AuthenticationRequest request, 
             HttpServletRequest httpServletRequest) {
-        logger.info("Citizen login attempt for email: {}", request.getEmail());
         UserAuthenticationResponse response = citizenService.login(request, httpServletRequest);
-        logger.info("Citizen login successful for email: {}", request.getEmail());
         return ResponseEntity.ok(response);
     }
 
@@ -134,10 +122,7 @@ public class CitizenController {
             @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "Page size", example = "10")
             @RequestParam(defaultValue = "10") int size) {
-        logger.info("Fetching all citizens - page: {}, size: {}", page, size);
         PaginationDTO<CitizenDTOResponse> citizens = citizenService.getAllCitizens(page, size);
-        logger.info("Retrieved {} citizens (page {} of {})", 
-                   citizens.getContent().size(), page, citizens.getTotalPages());
         return ResponseEntity.ok(citizens);
     }
 
@@ -147,9 +132,7 @@ public class CitizenController {
     public ResponseEntity<CitizenDTOResponse> getCitizenById(
             @Parameter(description = "Citizen ID", example = "1") 
             @PathVariable Long id) {
-        logger.info("Fetching citizen with ID: {}", id);
         CitizenDTOResponse citizen = citizenService.getCitizenById(id);
-        logger.info("Retrieved citizen: {}", citizen.getName());
         return ResponseEntity.ok(citizen);
     }
 
@@ -162,10 +145,7 @@ public class CitizenController {
             @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "Page size", example = "10")
             @RequestParam(defaultValue = "10") int size) {
-        logger.info("Searching citizens with name: {} - page: {}, size: {}", name, page, size);
         PaginationDTO<CitizenDTOResponse> citizens = citizenService.searchCitizensByName(name, page, size);
-        logger.info("Found {} citizens matching search criteria (page {} of {})", 
-                   citizens.getContent().size(), page, citizens.getTotalPages());
         return ResponseEntity.ok(citizens);
     }
 
@@ -178,9 +158,7 @@ public class CitizenController {
     public ResponseEntity<CitizenDTOResponse> createCitizen(
             @Parameter(description = "Citizen data", required = true)
             @RequestBody CitizenDTORequest dto) {
-        logger.info("Creating new citizen with name: {}", dto.getName());
         CitizenDTOResponse citizen = citizenService.createCitizen(dto);
-        logger.info("Successfully created citizen with ID: {}", citizen.getId());
         return ResponseEntity.ok(citizen);
     }
 
@@ -191,9 +169,7 @@ public class CitizenController {
             @PathVariable Long id,
             @Parameter(description = "Updated citizen data", required = true)
                                               @RequestBody CitizenDTORequest dto) {
-        logger.info("Updating citizen with ID: {}", id);
         CitizenDTOResponse citizen = citizenService.updateCitizen(id, dto);
-        logger.info("Successfully updated citizen: {}", citizen.getName());
         return ResponseEntity.ok(citizen);
     }
 
@@ -202,9 +178,7 @@ public class CitizenController {
     public ResponseEntity<Void> deleteCitizen(
             @Parameter(description = "Citizen ID", example = "1") 
             @PathVariable Long id) {
-        logger.info("Deleting citizen with ID: {}", id);
         citizenService.deleteCitizen(id);
-        logger.info("Successfully deleted citizen with ID: {}", id);
         return ResponseEntity.ok().build();
     }
 } 

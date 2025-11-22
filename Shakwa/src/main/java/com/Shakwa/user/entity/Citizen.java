@@ -15,7 +15,12 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "citizens")
 @EntityListeners(AuditingEntityListener.class)
-public class Citizen extends BaseUser {
+public class Citizen extends User {
+
+    @Override
+    protected String getSequenceName() {
+        return "citizens_id_seq";
+    }
 
     @CreatedDate
     private LocalDateTime createdAt;

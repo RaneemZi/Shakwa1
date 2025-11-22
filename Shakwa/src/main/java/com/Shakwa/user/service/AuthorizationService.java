@@ -1,5 +1,6 @@
 package com.Shakwa.user.service;
 
+import com.Shakwa.user.repository.EmployeeRepository;
 import org.springframework.stereotype.Service;
 
 import com.Shakwa.user.entity.User;
@@ -8,8 +9,11 @@ import com.Shakwa.user.repository.UserRepository;
 
 @Service
 public class AuthorizationService extends BaseSecurityService {
-    protected AuthorizationService(UserRepository userRepository, CitizenRepo citizenRepo) {
-        super(userRepository, citizenRepo);
+    private final EmployeeRepository employeeRepository;
+
+    protected AuthorizationService(UserRepository userRepository, CitizenRepo citizenRepo, EmployeeRepository employeeRepository) {
+        super(userRepository, citizenRepo, employeeRepository);
+        this.employeeRepository = employeeRepository;
     }
 
 //    @Autowired

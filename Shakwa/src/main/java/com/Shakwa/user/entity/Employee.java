@@ -14,6 +14,11 @@ import java.time.LocalDate;
 @Table(name = "employees")
 public class Employee extends User {
 
+    @Override
+    protected String getSequenceName() {
+        return "employees_id_seq";
+    }
+
     @Enumerated(EnumType.STRING)
     @Column(name = "government_agency")
     private GovernmentAgencyType governmentAgency;

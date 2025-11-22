@@ -1,5 +1,6 @@
 package com.Shakwa.user.service;
 
+import com.Shakwa.user.repository.EmployeeRepository;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -18,11 +19,12 @@ public abstract class BaseSecurityService {
 
     protected final UserRepository userRepository;
     protected final CitizenRepo citizenRepo;
+    private final EmployeeRepository employeeRepository;
 
-    protected BaseSecurityService(UserRepository userRepository, CitizenRepo citizenRepo) {
+    protected BaseSecurityService(UserRepository userRepository, CitizenRepo citizenRepo, EmployeeRepository employeeRepository) {
         this.userRepository = userRepository;
         this.citizenRepo = citizenRepo;
-
+        this.employeeRepository = employeeRepository;
     }
 
     /**
@@ -36,8 +38,17 @@ public abstract class BaseSecurityService {
         if (authentication == null || !authentication.isAuthenticated()) {
             throw new ResourceNotFoundException("User not authenticated");
         }
-        return userRepository.findByEmail(authentication.getName())
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        User user = userRepository.findByEmail(authentication.getName()).orElse(null);
+        if (user == null) {
+            user = citizenRepo.findByEmail(authentication.getName()).orElse(null);
+        }
+        if (user == null) {
+            user = employeeRepository.findByEmail(authentication.getName()).orElseThrow(
+                    ()-> new ResourceNotFoundException("User isn't employee and not citizen and it's not found")
+            );
+        }
+        return user;
     }
 
     /**

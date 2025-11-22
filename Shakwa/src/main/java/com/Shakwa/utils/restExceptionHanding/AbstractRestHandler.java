@@ -92,6 +92,39 @@ public class AbstractRestHandler {
         return new ResponseEntity<>(apiException,conflict);
     }
 
+    @ExceptionHandler(value = {LockedException.class})
+    public ResponseEntity<Object> handleLockedException(LockedException e){
+        HttpStatus locked = HttpStatus.LOCKED; // 423
+        ApiException apiException = new ApiException(
+                e.getMessage(),
+                locked,
+                LocalDateTime.now()
+        );
+        return new ResponseEntity<>(apiException, locked);
+    }
+
+    @ExceptionHandler(value = {OptimisticLockException.class})
+    public ResponseEntity<Object> handleOptimisticLockException(OptimisticLockException e){
+        HttpStatus conflict = HttpStatus.CONFLICT; // 409 - Conflict due to concurrent modification
+        ApiException apiException = new ApiException(
+                e.getMessage(),
+                conflict,
+                LocalDateTime.now()
+        );
+        return new ResponseEntity<>(apiException, conflict);
+    }
+
+    @ExceptionHandler(value = {jakarta.persistence.OptimisticLockException.class})
+    public ResponseEntity<Object> handleJpaOptimisticLockException(jakarta.persistence.OptimisticLockException e){
+        HttpStatus conflict = HttpStatus.CONFLICT;
+        ApiException apiException = new ApiException(
+                "تم تعديل هذه الشكوى من قبل موظف آخر. يرجى تحديث الصفحة والمحاولة مرة أخرى.",
+                conflict,
+                LocalDateTime.now()
+        );
+        return new ResponseEntity<>(apiException, conflict);
+    }
+
     @ExceptionHandler(value = {InvalidStatusTransitionException.class})
     public ResponseEntity<Object> handleInvalidStatusTransitionException(InvalidStatusTransitionException e){
         HttpStatus invalidStatus = HttpStatus.BAD_REQUEST;

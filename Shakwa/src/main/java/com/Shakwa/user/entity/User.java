@@ -22,6 +22,11 @@ import java.util.stream.Collectors;
 @Inheritance(strategy = InheritanceType.JOINED)
 public class User extends BaseUser {
 
+    @Override
+    protected String getSequenceName() {
+        return "users_id_seq";
+    }
+
     private String position;
 
     @Enumerated(EnumType.STRING)

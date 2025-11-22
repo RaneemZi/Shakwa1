@@ -45,8 +45,8 @@ public class SystemRolesInitializer implements CommandLineRunner {
         // Always create/update system roles (will update if exist, create if not)
         createSystemRoles(permissions);
         
-        // Remove old roles that are no longer needed
-        removeOldRoles();
+//        // Remove old roles that are no longer needed
+//        removeOldRoles();
         
         log.info("System roles and permissions initialized successfully");
     }
@@ -141,6 +141,10 @@ public class SystemRolesInitializer implements CommandLineRunner {
                 permissions.get("CITIZEN_READ"),
                 permissions.get("REPORT_VIEW")
             )));
+
+        // Citizen role
+        createSystemRole(RoleConstants.CITIZEN, "Citizen",
+                new HashSet<>(Arrays.asList()));
     }
 
     private Permission createPermission(String name, String description, String resource, String action) {
@@ -176,48 +180,48 @@ public class SystemRolesInitializer implements CommandLineRunner {
         roleRepository.save(role);
     }
     
-    /**
-     * Remove old roles that are no longer used in the system
-     */
-    private void removeOldRoles() {
-        List<String> oldRoleNames = Arrays.asList(
-            "PHARMACY_MANAGER",
-            "PHARMACY_EMPLOYEE",
-            "PHARMACY_TRAINEE"
-        );
-        
-        for (String oldRoleName : oldRoleNames) {
-            roleRepository.findByName(oldRoleName).ifPresent(role -> {
-                try {
-                    // Check if any users are using this role
-                    List<User> usersWithRole = userRepository.findAll().stream()
-                            .filter(user -> user.getRole() != null && user.getRole().getId().equals(role.getId()))
-                            .toList();
-                    
-                    if (!usersWithRole.isEmpty()) {
-                        log.warn("Cannot delete role '{}' because {} user(s) are using it. Please migrate users to SUPERVISOR or VIEWER first.", 
-                                oldRoleName, usersWithRole.size());
-                        log.warn("Users using this role: {}", 
-                                usersWithRole.stream()
-                                        .map(u -> u.getEmail() + " (ID: " + u.getId() + ")")
-                                        .collect(java.util.stream.Collectors.joining(", ")));
-                        // Deactivate instead of delete if users exist
-                        role.setActive(false);
-                        roleRepository.save(role);
-                    } else {
-                        // Safe to delete - no users are using this role
-                        log.info("Deleting old role '{}' (no users are using it)", oldRoleName);
-                        roleRepository.delete(role);
-                        log.info("Successfully deleted role '{}'", oldRoleName);
-                    }
-                } catch (Exception e) {
-                    log.error("Error while trying to delete role '{}': {}", oldRoleName, e.getMessage());
-                    // Fallback: deactivate instead of delete
-                    role.setActive(false);
-                    roleRepository.save(role);
-                    log.warn("Deactivated role '{}' instead of deleting due to error", oldRoleName);
-                }
-            });
-        }
-    }
-} 
+//    /**
+//     * Remove old roles that are no longer used in the system
+//     */
+//    private void removeOldRoles() {
+//        List<String> oldRoleNames = Arrays.asList(
+//            "PHARMACY_MANAGER",
+//            "PHARMACY_EMPLOYEE",
+//            "PHARMACY_TRAINEE"
+//        );
+//
+//        for (String oldRoleName : oldRoleNames) {
+//            roleRepository.findByName(oldRoleName).ifPresent(role -> {
+//                try {
+//                    // Check if any users are using this role
+//                    List<User> usersWithRole = userRepository.findAll().stream()
+//                            .filter(user -> user.getRole() != null && user.getRole().getId().equals(role.getId()))
+//                            .toList();
+//
+//                    if (!usersWithRole.isEmpty()) {
+//                        log.warn("Cannot delete role '{}' because {} user(s) are using it. Please migrate users to SUPERVISOR or VIEWER first.",
+//                                oldRoleName, usersWithRole.size());
+//                        log.warn("Users using this role: {}",
+//                                usersWithRole.stream()
+//                                        .map(u -> u.getEmail() + " (ID: " + u.getId() + ")")
+//                                        .collect(java.util.stream.Collectors.joining(", ")));
+//                        // Deactivate instead of delete if users exist
+//                        role.setActive(false);
+//                        roleRepository.save(role);
+//                    } else {
+//                        // Safe to delete - no users are using this role
+//                        log.info("Deleting old role '{}' (no users are using it)", oldRoleName);
+//                        roleRepository.delete(role);
+//                        log.info("Successfully deleted role '{}'", oldRoleName);
+//                    }
+//                } catch (Exception e) {
+//                    log.error("Error while trying to delete role '{}': {}", oldRoleName, e.getMessage());
+//                    // Fallback: deactivate instead of delete
+//                    role.setActive(false);
+//                    roleRepository.save(role);
+//                    log.warn("Deactivated role '{}' instead of deleting due to error", oldRoleName);
+//                }
+//            });
+//        }
+//    }
+}

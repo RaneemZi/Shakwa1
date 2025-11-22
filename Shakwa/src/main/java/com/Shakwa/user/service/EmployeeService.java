@@ -4,6 +4,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.logging.Logger;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -41,8 +42,9 @@ import jakarta.servlet.http.HttpServletRequest;
 @Service
 @Transactional
 public class EmployeeService extends BaseSecurityService {
-    
-    private final EmployeeRepository employeeRepository;
+
+    @Autowired
+    private EmployeeRepository employeeRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
@@ -51,16 +53,15 @@ public class EmployeeService extends BaseSecurityService {
     private final RateLimiterRegistry rateLimiterRegistry;
     
     public EmployeeService(EmployeeRepository employeeRepository,
-                          RoleRepository roleRepository,
-                         PasswordEncoder passwordEncoder,
-                         UserRepository userRepository,
-                         CitizenRepo citizenRepo,
-                         AuthenticationManager authenticationManager,
-                         JwtService jwtService,
-                         RateLimiterConfig rateLimiterConfig,
-                         RateLimiterRegistry rateLimiterRegistry) {
-        super(userRepository, citizenRepo);
-        this.employeeRepository = employeeRepository;
+                           RoleRepository roleRepository,
+                           PasswordEncoder passwordEncoder,
+                           UserRepository userRepository,
+                           CitizenRepo citizenRepo, EmployeeRepository employeeRepository1,
+                           AuthenticationManager authenticationManager,
+                           JwtService jwtService,
+                           RateLimiterConfig rateLimiterConfig,
+                           RateLimiterRegistry rateLimiterRegistry) {
+        super(userRepository, citizenRepo , employeeRepository);
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
         this.authenticationManager = authenticationManager;
@@ -180,14 +181,14 @@ public class EmployeeService extends BaseSecurityService {
         if (!(currentUser instanceof Employee)) {
             throw new UnAuthorizedException("Only governmentAgency employees can access employee data");
         }
-        
+
         Employee currentEmployee = (Employee) currentUser;
         if (currentEmployee.getGovernmentAgency() == null) {
             throw new UnAuthorizedException("Employee is not associated with any governmentAgency");
         }
-        
+
         GovernmentAgencyType currentGovernmentAgency = currentEmployee.getGovernmentAgency();
-        
+
         // Get the employee and validate governmentAgency access
         Employee employee = getEmployeeById(employeeId);
         if (!employee.getGovernmentAgency().equals(currentGovernmentAgency)) {
@@ -461,6 +462,6 @@ public class EmployeeService extends BaseSecurityService {
         return response;
     }
 
-    
+
    
 } 

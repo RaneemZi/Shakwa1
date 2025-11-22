@@ -23,6 +23,11 @@ import lombok.EqualsAndHashCode;
 @SequenceGenerator(name = "otp_verification_seq", sequenceName = "otp_verification_id_seq", allocationSize = 1)
 public class OtpVerification extends BaseEntity {
     
+    @Override
+    protected String getSequenceName() {
+        return "otp_verification_id_seq";
+    }
+    
     @Column(nullable = false, unique = true)
     private String email;
 

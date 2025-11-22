@@ -6,7 +6,7 @@ import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 
-import com.Shakwa.user.entity.User;
+import com.Shakwa.user.entity.BaseUser;
 
 import java.util.Optional;
 
@@ -22,7 +22,8 @@ public class ApplicationAuditingAware implements AuditorAware<Long> {
          authentication instanceof AnonymousAuthenticationToken){
             return Optional.of(1L);
         }
-        User dealerPrincipal = (User) authentication.getPrincipal();
-        return Optional.ofNullable(dealerPrincipal.getId());
+        // Use BaseUser instead of User since both User and Citizen extend BaseUser
+        BaseUser currentUser = (BaseUser) authentication.getPrincipal();
+        return Optional.ofNullable(currentUser.getId());
     }
 }

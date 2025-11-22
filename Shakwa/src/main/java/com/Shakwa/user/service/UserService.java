@@ -1,5 +1,7 @@
 package com.Shakwa.user.service;
 
+import com.Shakwa.user.entity.BaseUser;
+import com.Shakwa.user.repository.*;
 import io.github.resilience4j.ratelimiter.RateLimiter;
 import io.github.resilience4j.ratelimiter.RateLimiterRegistry;
 import jakarta.servlet.http.HttpServletRequest;
@@ -24,9 +26,6 @@ import com.Shakwa.user.entity.Permission;
 import com.Shakwa.user.entity.Role;
 import com.Shakwa.user.entity.User;
 import com.Shakwa.user.mapper.UserMapper;
-import com.Shakwa.user.repository.PermissionRepository;
-import com.Shakwa.user.repository.RoleRepository;
-import com.Shakwa.user.repository.UserRepository;
 import com.Shakwa.utils.exception.RequestNotValidException;
 import com.Shakwa.utils.exception.ResourceNotFoundException;
 import com.Shakwa.utils.exception.TooManyRequestException;
@@ -51,34 +50,36 @@ public class UserService {
     private final RateLimiterConfig rateLimiterConfig;
     private final RateLimiterRegistry rateLimiterRegistry;
     private final UserMapper userMapper;
-   
+    private final CitizenRepo citizenRepo;
+    private final EmployeeRepository employeeRepository;
+
     /**
      * Create a new user with territory assignments using BASE entity IDs
      */
 
 
 
-    public UserResponseDTO createUser(UserCreateRequestDTO request) {
-        User creator = getCurrentUser();
-        Role targetRole = roleRepository.findById(request.getRoleId())
-                .orElseThrow(() -> new ResourceNotFoundException("Role not found with id: " + request.getRoleId()));
-        
-        validateUserCreation(targetRole, creator.getRole());
-        
-        User user = new User();
-        user.setEmail(request.getEmail());
-        user.setPassword(passwordEncoder.encode(request.getPassword()));
-        user.setFirstName(request.getFirstName());
-        user.setLastName(request.getLastName());
-        user.setRole(targetRole);
-        
-        if (request.getPermissionIds() != null && !request.getPermissionIds().isEmpty()) {
-            Set<Permission> permissions = new HashSet<>(permissionRepository.findAllById(request.getPermissionIds()));
-            user.setAdditionalPermissions(permissions);
-        }
-        
-        return userMapper.toResponse(userRepository.save(user));
-    }
+//    public UserResponseDTO createUser(UserCreateRequestDTO request) {
+//        BaseUser creator = getCurrentUser();
+//        Role targetRole = roleRepository.findById(request.getRoleId())
+//                .orElseThrow(() -> new ResourceNotFoundException("Role not found with id: " + request.getRoleId()));
+//
+//        validateUserCreation(targetRole, creator.getRole());
+//
+//        User user = new User();
+//        user.setEmail(request.getEmail());
+//        user.setPassword(passwordEncoder.encode(request.getPassword()));
+//        user.setFirstName(request.getFirstName());
+//        user.setLastName(request.getLastName());
+//        user.setRole(targetRole);
+//
+//        if (request.getPermissionIds() != null && !request.getPermissionIds().isEmpty()) {
+//            Set<Permission> permissions = new HashSet<>(permissionRepository.findAllById(request.getPermissionIds()));
+//            user.setAdditionalPermissions(permissions);
+//        }
+//
+//        return userMapper.toResponse(userRepository.save(user));
+//    }
     
     private void validateUserCreation(Role targetRole, Role creatorRole) {
         // Platform Admin can create any role except another Platform Admin
@@ -234,8 +235,14 @@ public class UserService {
         if (authentication == null || !authentication.isAuthenticated()) {
             throw new ResourceNotFoundException("User not authenticated");
         }
-        return userRepository.findByEmail(authentication.getName())
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        User user = citizenRepo.findByEmail(authentication.getName()).orElse(null);
+        if (user == null) {
+            user = employeeRepository.findByEmail(authentication.getName()).orElseThrow(
+                    ()-> new ResourceNotFoundException("User isn't employee and not citizen and it's not found")
+            );
+        }
+        return user;
+
     }
     public UserResponseDTO getCurrentUserResponse(){
         return userMapper.toResponse(getCurrentUser());

@@ -17,6 +17,11 @@ import lombok.experimental.SuperBuilder;
 @SequenceGenerator(name = "permission_seq", sequenceName = "permissions_id_seq", allocationSize = 1)
 public class Permission extends BaseEntity {
     
+    @Override
+    protected String getSequenceName() {
+        return "permissions_id_seq";
+    }
+    
     @Column(nullable = false, unique = true)
     private String name;
     
