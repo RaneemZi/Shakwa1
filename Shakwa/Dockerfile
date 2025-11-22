@@ -27,8 +27,8 @@ WORKDIR /app
 # Copy the built Spring Boot JAR from the build stage
 COPY --from=build /app/target/*.jar /app/mithaq.jar
 
-# Expose the port your Spring Boot application listens on (3200)
-EXPOSE 3200
+# Expose the port your Spring Boot application listens on (3000 inside container)
+EXPOSE 3000
 
 # Define the command to run your Spring Boot application
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /app/mithaq.jar"]

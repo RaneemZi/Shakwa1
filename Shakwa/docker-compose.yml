@@ -54,6 +54,8 @@ services:
       SPRING_DATASOURCE_DATABASE: mithaq
       # Disable Flyway to prevent migration issues
       SPRING_FLYWAY_ENABLED: "false"
+      # Server port configuration - must match the container port in the port mapping
+      SERVER_PORT: "3000"
       # JVM memory settings to prevent memory leaks
       JAVA_OPTS: "-Xmx768m -Xms256m"
     networks:
