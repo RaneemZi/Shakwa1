@@ -3,6 +3,7 @@ package com.Shakwa.utils.Aspect;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
+import org.aspectj.lang.reflect.MethodSignature;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -11,6 +12,8 @@ import com.Shakwa.utils.annotation.Measured;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
+
+import java.lang.reflect.Method;
 
 /**
  * Aspect for recording performance metrics using Micrometer
@@ -36,9 +39,13 @@ public class PerformanceMetricsAspect {
         String metricName = "shakwa.service." + className.toLowerCase() + "." + methodName + ".duration";
         
         // Check for custom metric name from @Measured annotation
-        Measured measured = joinPoint.getSignature().getDeclaringType().getAnnotation(Measured.class);
-        if (measured == null) {
-            measured = joinPoint.getSignature().getMethod().getAnnotation(Measured.class);
+        Measured measured = null;
+        if (joinPoint.getSignature() instanceof MethodSignature methodSignature) {
+            Method method = methodSignature.getMethod();
+            measured = method.getAnnotation(Measured.class);
+            if (measured == null) {
+                measured = method.getDeclaringClass().getAnnotation(Measured.class);
+            }
         }
         if (measured != null && !measured.name().isEmpty()) {
             metricName = "shakwa.service." + measured.name() + ".duration";

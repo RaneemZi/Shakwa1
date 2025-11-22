@@ -106,6 +106,7 @@ public class ComplaintService extends BaseSecurityService {
     /**
      * إنشاء شكوى جديدة - فقط المواطن يمكنه إنشاؤها
      * يتم استخدام المواطن من الـ token تلقائياً
+     * Cache eviction handled at repository level.
      */
     @Audited(action = "CREATE_COMPLAINT", targetType = "COMPLAINT", includeArgs = false)
     public ComplaintDTOResponse createComplaint(ComplaintDTORequest dto, List<MultipartFile> files) {      
@@ -145,6 +146,7 @@ public class ComplaintService extends BaseSecurityService {
 
     /**
      * الحصول على جميع الشكاوى - للموظفين (حسب جهتهم الحكومية) أو المواطن (شكاويه فقط)
+     * Caching handled at repository level.
      */
     public PaginationDTO<ComplaintDTOResponse> getAllComplaints(int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
@@ -213,6 +215,7 @@ public class ComplaintService extends BaseSecurityService {
 
     /**
      * الحصول على شكاوى مواطن محدد
+     * Caching handled at repository level.
      */
     public PaginationDTO<ComplaintDTOResponse> getComplaintsByCitizenId(Long citizenId, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
@@ -236,6 +239,7 @@ public class ComplaintService extends BaseSecurityService {
 
     /**
      * الحصول على الشكاوى حسب الحالة
+     * Caching handled at repository level.
      */
     public PaginationDTO<ComplaintDTOResponse> getComplaintsByStatus(ComplaintStatus status, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
@@ -259,6 +263,7 @@ public class ComplaintService extends BaseSecurityService {
     /**
      * تحديث الشكوى - فقط الموظفين يمكنهم التحديث
      * Uses state-based locking (IN_PROGRESS status) + pessimistic + optimistic locking
+     * Cache eviction handled at repository level.
      */
     @Audited(action = "UPDATE_COMPLAINT", targetType = "COMPLAINT", includeArgs = false)
     public ComplaintDTOResponse updateComplaint(Long id, ComplaintDTORequest dto) {
@@ -318,6 +323,7 @@ public class ComplaintService extends BaseSecurityService {
     /**
      * الرد على الشكوى وتحديث حالتها - للموظفين فقط
      * Uses state-based locking (IN_PROGRESS status) + pessimistic + optimistic locking
+     * Cache eviction handled at repository level.
      */
     @Audited(action = "RESPOND_TO_COMPLAINT", targetType = "COMPLAINT", includeArgs = false)
     public ComplaintDTOResponse respondToComplaint(Long id, String response, ComplaintStatus newStatus) {
@@ -384,6 +390,7 @@ public class ComplaintService extends BaseSecurityService {
 
     /**
      * حذف الشكوى - فقط للمدير العام أو المواطن صاحب الشكوى
+     * Cache eviction handled at repository level.
      */
     public void deleteComplaint(Long id) {
         User currentUser = getCurrentUser();
@@ -408,6 +415,7 @@ public class ComplaintService extends BaseSecurityService {
 
     /**
      * البحث عن الشكاوى حسب نوع الشكوى
+     * Caching handled at repository level.
      */
     public PaginationDTO<ComplaintDTOResponse> getComplaintsByType(ComplaintType complaintType, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
@@ -430,6 +438,7 @@ public class ComplaintService extends BaseSecurityService {
 
     /**
      * البحث عن الشكاوى حسب المحافظة
+     * Caching handled at repository level.
      */
     public PaginationDTO<ComplaintDTOResponse> getComplaintsByGovernorate(Governorate governorate, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
@@ -485,6 +494,8 @@ public class ComplaintService extends BaseSecurityService {
 
     /**
      * فلترة الشكاوى حسب معايير متعددة
+     * Note: This method uses Specification queries which are not cached at repository level.
+     * Consider adding a custom repository method with caching if this endpoint is frequently used.
      */
     public PaginationDTO<ComplaintDTOResponse> filterComplaints(
             ComplaintStatus status,
